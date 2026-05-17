@@ -75,7 +75,7 @@ def generate_all_images(menu_items: List[dict], client: OpenAI) -> List[Image.Im
                 results[idx] = None
                 return
 
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
             executor.submit(task, i, item): i
             for i, item in enumerate(menu_items)
