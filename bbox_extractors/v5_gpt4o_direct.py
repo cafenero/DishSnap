@@ -117,15 +117,29 @@ def _merge_blocks(blocks: List[Dict], indices: List[int]) -> List[float]:
     return [x1, y1, x2, y2]
 
 
+def _resize_for_processing(image: Image.Image, max_side: int = 2048) -> Image.Image:
+    """長辺を指定サイズ以内に収めるよう縮小する。縮小不要なら元画像をそのまま返す。"""
+    w, h = image.size
+    if max(w, h) <= max_side:
+        return image
+    ratio = max_side / max(w, h)
+    new_size = (int(w * ratio), int(h * ratio))
+    return image.resize(new_size, Image.Resampling.LANCZOS)
+
+
 def extract_menu_items_v5(image: Image.Image, client: OpenAI) -> List[Dict[str, Any]]:
     """
     Hybrid方式でメニュー項目を抽出。
     戻り値: [{"name":..., "price":..., "description":..., "bbox":..., "bbox_pixels":..., "matched_blocks":...}, ...]
     """
-    img_w, img_h = image.size
+    original_w, original_h = image.size
+
+    # 処理用に長辺を2048pxに制限して縮小（PaddleOCR・API転送の高速化）
+    processing_image = _resize_for_processing(image, max_side=2048)
+    img_w, img_h = original_w, original_h  # bbox_pixels は元画像サイズ基準で計算
 
     # Step 1: PaddleOCR で全テキストブロックを抽出
-    ocr_blocks = _extract_ocr_blocks(image)
+    ocr_blocks = _extract_ocr_blocks(processing_image)
     if not ocr_blocks:
         return []
 
@@ -136,7 +150,7 @@ def extract_menu_items_v5(image: Image.Image, client: OpenAI) -> List[Dict[str, 
     ocr_summary = "\n".join(ocr_text_lines)
 
     # Step 3: GPT-4o に画像とOCRリストを渡してマッチング判定
-    b64_image = _encode_image_to_base64(image)
+    b64_image = _encode_image_to_base64(processing_image)
     data_uri = f"data:image/jpeg;base64,{b64_image}"
 
     system_prompt = (

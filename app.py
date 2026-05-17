@@ -7,7 +7,7 @@ from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
-from PIL import Image
+from PIL import Image, ImageOps
 
 from bbox_extractors import extract_text_bboxes_versioned
 from bbox_refiner import refine_bboxes_with_gpt4o
@@ -205,6 +205,7 @@ uploaded_file = st.file_uploader("Choose a menu photo", type=["jpg", "jpeg", "pn
 if uploaded_file is not None:
     # アップロード画像の読み込み
     raw_image = Image.open(uploaded_file)
+    raw_image = ImageOps.exif_transpose(raw_image)
 
     # 自動台形補正
     input_image, correction_success, correction_info = correct_perspective(raw_image)
