@@ -31,10 +31,32 @@ os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 _ocr = None
 
 
+def _suppress_stdout_stderr():
+    """Paddle/PaddleX の情報ログを一時的に抑制するコンテキストマネージャ"""
+    import contextlib
+    import sys
+    import os
+
+    @contextlib.contextmanager
+    def _suppress():
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        with open(os.devnull, "w") as devnull:
+            sys.stdout = devnull
+            sys.stderr = devnull
+            try:
+                yield
+            finally:
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+    return _suppress()
+
+
 def _get_ocr():
     global _ocr
     if _ocr is None:
-        _ocr = PaddleOCR(lang="en")
+        with _suppress_stdout_stderr():
+            _ocr = PaddleOCR(lang="en")
     return _ocr
 
 
@@ -48,7 +70,8 @@ def _extract_ocr_blocks(image: Image.Image) -> List[Dict[str, Any]]:
     """PaddleOCR でテキストブロックを抽出し、正規化bbox付きで返す"""
     ocr = _get_ocr()
     img_array = np.array(image.convert("RGB"))
-    results = ocr.predict(img_array)
+    with _suppress_stdout_stderr():
+        results = ocr.predict(img_array)
 
     if not results:
         return []
