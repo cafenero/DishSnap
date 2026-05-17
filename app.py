@@ -18,11 +18,10 @@ st.markdown(
     """
     <style>
     [data-testid="stFileUploaderDropzone"] {
-        border-color: #00cc00 !important;
+        color: #31333F !important;
     }
-    [data-testid="stFileUploaderDropzone"]:hover,
-    [data-testid="stFileUploaderDropzone"][aria-disabled="false"] {
-        border-color: #00cc00 !important;
+    [data-testid="stFileUploaderDropzone"] * {
+        color: inherit !important;
     }
     </style>
     """,
@@ -99,7 +98,7 @@ if uploaded_file is not None:
                 f"✅ Found {len(menu_items)} menu item(s)!\n\n{items_md}"
             ]
 
-            # 2. 各料理の画像を並列生成（最大20並列）
+            # 2. 各料理の画像を並列生成（最大10並列）
             progress_bar = st.progress(0, text="🎨 Generating dish images...")
             images = generate_all_images(menu_items, client)
             progress_bar.progress(100, text="🎨 Generating dish images... Done!")
