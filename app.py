@@ -14,6 +14,7 @@ from bbox_refiner import refine_bboxes_with_gpt4o
 from menu_extractor import extract_menu_items, match_bboxes
 from image_generator import generate_all_images
 from menu_layout import create_annotated_menu_image, create_bbox_debug_image
+from image_corrector import correct_perspective
 
 load_dotenv()
 
@@ -202,8 +203,27 @@ with st.sidebar:
 uploaded_file = st.file_uploader("Choose a menu photo", type=["jpg", "jpeg", "png", "webp"])
 
 if uploaded_file is not None:
-    # アップロード画像のプレビュー
-    input_image = Image.open(uploaded_file)
+    # アップロード画像の読み込み
+    raw_image = Image.open(uploaded_file)
+
+    # 自動台形補正
+    input_image, correction_success, correction_info = correct_perspective(raw_image)
+
+    # 補正結果の表示
+    if correction_success:
+        st.success(f"✅ Perspective correction applied. ({correction_info})")
+        with st.expander("🔬 Debug: Perspective Correction", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Original**")
+                st.image(raw_image, width="stretch")
+            with col2:
+                st.markdown("**Corrected**")
+                st.image(input_image, width="stretch")
+    else:
+        st.info(f"ℹ️ Using original image ({correction_info}).")
+        input_image = raw_image
+
     st.image(input_image, caption="Uploaded Menu", width="stretch")
 
     # 新しいファイルがアップロードされたら生成状態をリセット
