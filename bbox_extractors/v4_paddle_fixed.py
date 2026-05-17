@@ -2,7 +2,9 @@
 BBox Extractor v4: PaddleOCR + 単一スケール + 固定閾値50%
 PaddleOCR で単一スケールの行単位抽出し、水平重なり50%でマージする。
 """
+import contextlib
 import os
+import sys
 import warnings
 from typing import List, Dict, Any, Tuple
 
@@ -19,11 +21,27 @@ os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 _ocr = None
 
 
+@contextlib.contextmanager
+def _suppress_stdout_stderr():
+    """Paddle/PaddleX の情報ログを一時的に抑制する"""
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    with open(os.devnull, "w") as devnull:
+        sys.stdout = devnull
+        sys.stderr = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+
 def _get_ocr():
     """PaddleOCR インスタンスを取得（遅延初期化）"""
     global _ocr
     if _ocr is None:
-        _ocr = PaddleOCR(lang="en")
+        with _suppress_stdout_stderr():
+            _ocr = PaddleOCR(lang="en")
     return _ocr
 
 
@@ -35,7 +53,8 @@ def extract_text_bboxes_v4(image: Image.Image, **kwargs) -> List[Dict[str, Any]]
     # 1. 単一スケール OCR
     ocr = _get_ocr()
     img_array = np.array(image.convert("RGB"))
-    results = ocr.predict(img_array)
+    with _suppress_stdout_stderr():
+        results = ocr.predict(img_array)
 
     if not results:
         return []
