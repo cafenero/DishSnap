@@ -11,3 +11,4 @@ build/
 *.jpg
 *.jpeg
 .DS_Store
+generated_images/

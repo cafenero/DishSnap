@@ -2,7 +2,8 @@ import base64
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 import requests
 from PIL import Image
@@ -43,20 +44,43 @@ def generate_dish_image(item: dict, client: OpenAI) -> Image.Image:
     return Image.open(BytesIO(image_bytes))
 
 
-def generate_all_images(menu_items: List[dict], client: OpenAI) -> List[Image.Image]:
+def generate_all_images(
+    menu_items: List[dict],
+    client: OpenAI,
+    cache_dir: Optional[Path] = None,
+) -> List[Optional[Image.Image]]:
     """
-    全メニュー項目の画像を並列生成する（最大20並列）。
+    全メニュー項目の画像を並列生成する（最大5並列）。
     429エラー時はリトライする。
     失敗した場合はNoneを返す（呼び出し側でスキップ）。
+    cache_dir が指定されていれば、生成成功した画像を保存し、
+    既存キャッシュがあればAPI呼び出しをスキップする。
     """
     results = [None] * len(menu_items)
 
     def task(idx: int, item: dict):
         name = item.get("name", "Unknown dish")
+
+        # キャッシュチェック
+        if cache_dir is not None:
+            cache_path = cache_dir / f"item_{idx}.png"
+            if cache_path.exists():
+                print(f"📦 Cache hit: {name}")
+                results[idx] = Image.open(cache_path)
+                return
+
         for attempt in range(3):
             try:
                 img = generate_dish_image(item, client)
                 results[idx] = img
+
+                # キャッシュ保存
+                if cache_dir is not None:
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    cache_path = cache_dir / f"item_{idx}.png"
+                    img.save(cache_path)
+                    print(f"💾 Saved cache: {name}")
+
                 print(f"✅ Generated: {name}")
                 return
             except RateLimitError:
