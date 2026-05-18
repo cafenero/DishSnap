@@ -2,47 +2,12 @@
 BBox Extractor v2: PaddleOCR + 固定閾値マージ（水平30%・80%達成版）
 PaddleOCR で行単位抽出し、固定閾値でメニュー項目単位にマージする。
 """
-import contextlib
-import io
-import os
-import sys
-import warnings
 from typing import List, Dict, Any
 
 import numpy as np
 from PIL import Image
-from paddleocr import PaddleOCR
 
-# Paddle/PaddleOCR の警告とログを抑制
-warnings.filterwarnings("ignore", message="No ccache found")
-os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
-
-# PaddleOCR インスタンスをグローバルに保持（初回ロード時間短縮）
-_ocr = None
-
-
-@contextlib.contextmanager
-def _suppress_stdout_stderr():
-    """Paddle/PaddleX の情報ログを一時的に抑制する"""
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    with open(os.devnull, "w") as devnull:
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-
-def _get_ocr():
-    """PaddleOCR インスタンスを取得（遅延初期化）"""
-    global _ocr
-    if _ocr is None:
-        with _suppress_stdout_stderr():
-            _ocr = PaddleOCR(lang="en")
-    return _ocr
+from .common_ocr import get_ocr, suppress_stdout_stderr
 
 
 def extract_text_bboxes_v2(image: Image.Image, **kwargs) -> List[Dict[str, Any]]:
@@ -50,11 +15,11 @@ def extract_text_bboxes_v2(image: Image.Image, **kwargs) -> List[Dict[str, Any]]
     PaddleOCR を使って画像内の全テキストブロックを抽出する。
     行単位の結果を固定閾値でブロック単位に再構成する。
     """
-    ocr = _get_ocr()
+    ocr = get_ocr()
 
     # PIL Image を numpy.ndarray に変換
     img_array = np.array(image.convert("RGB"))
-    with _suppress_stdout_stderr():
+    with suppress_stdout_stderr():
         results = ocr.predict(img_array)
 
     if not results:

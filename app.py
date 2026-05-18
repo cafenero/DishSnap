@@ -556,29 +556,54 @@ if uploaded_file is not None:
                     "v5_gpt4o_direct": "v5: GPT-4o Direct (name+bbox)",
                 }
 
-                # 3列グリッドで表示（v5追加）
-                cols = st.columns(3)
-                for i, version in enumerate(versions):
-                    with cols[i % 3]:
-                        st.markdown(f"**{version_names[version]}**")
-                        try:
-                            if version in ("v1_gpt4o", "v5_gpt4o_direct"):
-                                results = extract_text_bboxes_versioned(input_image, version=version, client=client)
+                # 比較実行ボタン（exanderを開いただけでは実行しない）
+                if st.button("▶️ Run Comparison", key="run_bbox_comparison"):
+                    with st.spinner("Running all extractors (this may take a moment)..."):
+                        compare_results = {}
+                        for version in versions:
+                            try:
+                                if version in ("v1_gpt4o", "v5_gpt4o_direct"):
+                                    results = extract_text_bboxes_versioned(input_image, version=version, client=client)
+                                else:
+                                    results = extract_text_bboxes_versioned(input_image, version=version)
+
+                                # 擬似的に menu_items 形式に変換
+                                dummy_items = []
+                                for r in results:
+                                    label = r.get("name", r.get("text", ""))[:30]
+                                    dummy_items.append({
+                                        "name": label,
+                                        "bbox": r["bbox"]
+                                    })
+
+                                debug_buf = create_bbox_debug_image(input_image, dummy_items)
+                                compare_results[version] = {
+                                    "items": dummy_items,
+                                    "count": len(results),
+                                    "buffer": debug_buf,
+                                }
+                            except Exception as e:
+                                compare_results[version] = {"error": str(e)}
+
+                        st.session_state.bbox_compare_results = compare_results
+                        st.rerun()
+
+                # 結果を表示
+                if "bbox_compare_results" in st.session_state and st.session_state.bbox_compare_results:
+                    results = st.session_state.bbox_compare_results
+                    cols = st.columns(3)
+                    for i, version in enumerate(versions):
+                        with cols[i % 3]:
+                            st.markdown(f"**{version_names[version]}**")
+                            if version in results:
+                                if "error" in results[version]:
+                                    st.error(f"Error: {results[version]['error']}")
+                                else:
+                                    st.image(results[version]["buffer"], width='stretch')
+                                    st.caption(f"Detected {results[version]['count']} blocks")
                             else:
-                                results = extract_text_bboxes_versioned(input_image, version=version)
+                                st.info("No result")
 
-                            # 擬似的に menu_items 形式に変換して可視化
-                            dummy_items = []
-                            for r in results:
-                                # v5 は name キーを持つ、v1-v4 は text キーを持つ
-                                label = r.get("name", r.get("text", ""))[:30]
-                                dummy_items.append({
-                                    "name": label,
-                                    "bbox": r["bbox"]
-                                })
-
-                            debug_buf = create_bbox_debug_image(input_image, dummy_items)
-                            st.image(debug_buf, width='stretch')
-                            st.caption(f"Detected {len(results)} blocks")
-                        except Exception as e:
-                            st.error(f"Error: {e}")
+                    if st.button("🗑️ Clear Comparison Results", key="clear_bbox_compare"):
+                        st.session_state.bbox_compare_results = {}
+                        st.rerun()
