@@ -2,47 +2,13 @@
 BBox Extractor v3: PaddleOCR + マルチスケール + K-means + GPT-4o 検証
 複数スケールで OCR 実行し、K-means クラスタリングで動的閾値を計算する。
 """
-import contextlib
-import os
-import sys
-import warnings
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
 from PIL import Image
-from paddleocr import PaddleOCR
 from sklearn.cluster import KMeans
 
-# Paddle/PaddleOCR の警告とログを抑制
-warnings.filterwarnings("ignore", message="No ccache found")
-os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
-
-# PaddleOCR インスタンスをグローバルに保持（初回ロード時間短縮）
-_ocr = None
-
-
-@contextlib.contextmanager
-def _suppress_stdout_stderr():
-    """Paddle/PaddleX の情報ログを一時的に抑制する"""
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    with open(os.devnull, "w") as devnull:
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-
-def _get_ocr():
-    """PaddleOCR インスタンスを取得（遅延初期化）"""
-    global _ocr
-    if _ocr is None:
-        with _suppress_stdout_stderr():
-            _ocr = PaddleOCR(lang="en")
-    return _ocr
+from .common_ocr import get_ocr, suppress_stdout_stderr
 
 
 def extract_text_bboxes_v3(image: Image.Image, **kwargs) -> List[Dict[str, Any]]:
@@ -84,7 +50,8 @@ def _multiscale_ocr(image: Image.Image, scales: List[float] = None) -> List[Dict
     if scales is None:
         scales = [1.0, 1.25, 1.5]
 
-    ocr = _get_ocr()
+    ocr = get_ocr()
+
     all_items = []
     orig_w, orig_h = image.size
 
@@ -97,7 +64,7 @@ def _multiscale_ocr(image: Image.Image, scales: List[float] = None) -> List[Dict
             resized = image.resize((new_w, new_h), Image.LANCZOS)
 
         img_array = np.array(resized.convert("RGB"))
-        with _suppress_stdout_stderr():
+        with suppress_stdout_stderr():
             results = ocr.predict(img_array)
 
         if results:

@@ -2,47 +2,13 @@
 BBox Extractor v4: PaddleOCR + 単一スケール + 固定閾値50%
 PaddleOCR で単一スケールの行単位抽出し、水平重なり50%でマージする。
 """
-import contextlib
-import os
-import sys
-import warnings
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
 from PIL import Image
-from paddleocr import PaddleOCR
 from sklearn.cluster import KMeans
 
-# Paddle/PaddleOCR の警告とログを抑制
-warnings.filterwarnings("ignore", message="No ccache found")
-os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
-
-# PaddleOCR インスタンスをグローバルに保持（初回ロード時間短縮）
-_ocr = None
-
-
-@contextlib.contextmanager
-def _suppress_stdout_stderr():
-    """Paddle/PaddleX の情報ログを一時的に抑制する"""
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    with open(os.devnull, "w") as devnull:
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-
-def _get_ocr():
-    """PaddleOCR インスタンスを取得（遅延初期化）"""
-    global _ocr
-    if _ocr is None:
-        with _suppress_stdout_stderr():
-            _ocr = PaddleOCR(lang="en")
-    return _ocr
+from .common_ocr import get_ocr, suppress_stdout_stderr
 
 
 def extract_text_bboxes_v4(image: Image.Image, **kwargs) -> List[Dict[str, Any]]:
@@ -51,9 +17,9 @@ def extract_text_bboxes_v4(image: Image.Image, **kwargs) -> List[Dict[str, Any]]
     単一スケール OCR → カラム分離 → 固定閾値で行マージ
     """
     # 1. 単一スケール OCR
-    ocr = _get_ocr()
+    ocr = get_ocr()
     img_array = np.array(image.convert("RGB"))
-    with _suppress_stdout_stderr():
+    with suppress_stdout_stderr():
         results = ocr.predict(img_array)
 
     if not results:
